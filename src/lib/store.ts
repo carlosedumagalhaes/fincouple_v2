@@ -1,6 +1,7 @@
 import { AppState, Transaction, Goal, SplitExpense, USERS } from '../types'
 import { format } from 'date-fns'
 
+// Bump version to clear old seed data from localStorage
 const STORAGE_KEY = 'fincouple_v2'
 
 function getDefaultState(): AppState {

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useApp } from '../hooks/useApp'
 import { fmtBRL, getMonthTransactions, calcTotals } from '../lib/store'
-import { BudgetLimit, CATEGORIES_EXPENSE } from '../types'
-import { Check } from 'lucide-react'
+import { CATEGORIES_EXPENSE } from '../types'
+import { Check, Sparkles, Loader } from 'lucide-react'
 
 function priceInstallment(principal: number, annualRate: number, months: number): number {
   if (annualRate === 0) return principal / months
@@ -40,15 +40,19 @@ export default function Planning() {
   const [buyInstallments, setBuyInstallments] = useState(12)
   const [buyRate, setBuyRate] = useState(2.99)
   const [buyMode, setBuyMode] = useState<'avista' | 'parcelado'>('avista')
+  const [buyDescription, setBuyDescription] = useState('')
+
+  // AI analysis
+  const [aiAnalysis, setAiAnalysis] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
 
   const balance = income - monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const canBuyAvista = buyValue <= balance
   const balAfterBuy = balance - buyValue
   const buyPctBalance = balance > 0 ? (buyValue / balance) * 100 : 0
 
-  const installmentValue = buyValue > 0 ? priceInstallment(buyValue, buyRate * buyInstallments > 0 ? buyRate : 0, buyInstallments) : 0
+  const installmentValue = buyValue > 0 ? priceInstallment(buyValue, buyRate > 0 ? buyRate : 0, buyInstallments) : 0
   const totalPaid = installmentValue * buyInstallments
-  const interestCost = totalPaid - buyValue
   const installmentPctIncome = income > 0 ? (installmentValue / income) * 100 : 0
 
   // Budget limits
@@ -62,6 +66,65 @@ export default function Planning() {
     setBudgetValue('')
   }
 
+  const askAI = async () => {
+    if (!buyValue) return
+    setAiLoading(true)
+    setAiAnalysis('')
+
+    const totalExpense = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    const topCategories = CATEGORIES_EXPENSE
+      .map(cat => ({ cat, val: monthTxs.filter(t => t.type === 'expense' && t.category === cat).reduce((s, t) => s + t.amount, 0) }))
+      .filter(c => c.val > 0).sort((a, b) => b.val - a.val).slice(0, 4)
+      .map(c => `${c.cat}: ${fmtBRL(c.val)}`).join(', ')
+
+    const goalsInfo = state.goals.filter(g => g.scope === 'shared').slice(0, 2)
+      .map(g => `${g.name} (${((g.currentAmount / g.targetAmount) * 100).toFixed(0)}% da meta)`).join(', ')
+
+    const prompt = buyMode === 'avista'
+      ? `Você é um consultor financeiro brasileiro direto e simpático. Analise se o casal deve fazer esta compra:
+
+COMPRA: ${buyDescription || 'Item não especificado'} — ${fmtBRL(buyValue)} à vista
+RENDA DO CASAL: ${fmtBRL(income)}/mês
+GASTOS TOTAIS: ${fmtBRL(totalExpense)}/mês
+SALDO ATUAL: ${fmtBRL(balance)}
+SALDO APÓS COMPRA: ${fmtBRL(balAfterBuy)} (${buyPctBalance.toFixed(1)}% do saldo)
+MAIORES GASTOS: ${topCategories || 'sem dados'}
+METAS EM ANDAMENTO: ${goalsInfo || 'nenhuma'}
+
+Dê um parecer em 3-4 linhas: se pode ou não pode, por que, e uma dica prática. Seja direto, use números reais. Não use markdown.`
+      : `Você é um consultor financeiro brasileiro direto e simpático. Analise se o casal deve parcelar esta compra:
+
+COMPRA: ${buyDescription || 'Item não especificado'} — ${fmtBRL(buyValue)} em ${buyInstallments}x de ${fmtBRL(installmentValue)} (${buyRate}% ao mês)
+TOTAL COM JUROS: ${fmtBRL(totalPaid)} (juros: ${fmtBRL(totalPaid - buyValue)})
+RENDA DO CASAL: ${fmtBRL(income)}/mês
+GASTOS TOTAIS: ${fmtBRL(totalExpense)}/mês
+SALDO ATUAL: ${fmtBRL(balance)}
+PARCELA = ${installmentPctIncome.toFixed(1)}% da renda
+MAIORES GASTOS: ${topCategories || 'sem dados'}
+METAS EM ANDAMENTO: ${goalsInfo || 'nenhuma'}
+
+Dê um parecer em 3-4 linhas: se vale parcelar ou pagar à vista, o custo real dos juros, e uma dica. Seja direto. Não use markdown.`
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 300,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text ?? 'Não foi possível obter análise.'
+      setAiAnalysis(text)
+    } catch {
+      setAiAnalysis('Erro ao conectar com a IA. Verifique sua conexão.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   return (
     <div className="animate-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
@@ -73,24 +136,19 @@ export default function Planning() {
         {/* Emergency fund */}
         <div className="card">
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>🛡️ Reserva de Emergência</div>
-
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Meta em meses de gastos fixos</label>
             <div style={{ display: 'flex', gap: 6 }}>
               {[3, 6, 12].map(m => (
-                <button key={m} onClick={() => setEmergMonths(m)} className="btn btn-sm"
-                  style={{
-                    flex: 1,
-                    background: emergMonths === m ? 'rgba(16,185,129,0.2)' : 'var(--bg-card2)',
-                    border: emergMonths === m ? '1px solid rgba(16,185,129,0.4)' : '1px solid var(--border)',
-                    color: emergMonths === m ? 'var(--green)' : 'var(--text-muted)',
-                  }}>
-                  {m} meses
-                </button>
+                <button key={m} onClick={() => setEmergMonths(m)} className="btn btn-sm" style={{
+                  flex: 1,
+                  background: emergMonths === m ? 'rgba(16,185,129,0.2)' : 'var(--bg-card2)',
+                  border: emergMonths === m ? '1px solid rgba(16,185,129,0.4)' : '1px solid var(--border)',
+                  color: emergMonths === m ? 'var(--green)' : 'var(--text-muted)',
+                }}>{m} meses</button>
               ))}
             </div>
           </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
             {[
               { label: 'Meta Total', value: fmtBRL(emergTarget), color: 'var(--text)' },
@@ -104,12 +162,8 @@ export default function Planning() {
               </div>
             ))}
           </div>
-
           <div className="progress-bar" style={{ height: 8 }}>
-            <div className="progress-fill" style={{
-              width: `${Math.min((emergSaved / (emergTarget || 1)) * 100, 100)}%`,
-              background: 'var(--green)'
-            }} />
+            <div className="progress-fill" style={{ width: `${Math.min((emergSaved / (emergTarget || 1)) * 100, 100)}%`, background: 'var(--green)' }} />
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'right' }}>
             {emergTarget > 0 ? ((emergSaved / emergTarget) * 100).toFixed(1) : 0}% da meta
@@ -119,7 +173,6 @@ export default function Planning() {
         {/* Property simulator */}
         <div className="card">
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>🏡 Simulador de Imóvel</div>
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
             {[
               { label: 'Valor do Imóvel (R$)', value: propValue, setter: (v: number) => setPropValue(v), step: 10000 },
@@ -127,16 +180,13 @@ export default function Planning() {
             ].map(field => (
               <div key={field.label}>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>{field.label}</label>
-                <input className="input" type="number" step={field.step} value={field.value}
-                  onChange={e => field.setter(parseFloat(e.target.value) || 0)} />
+                <input className="input" type="number" step={field.step} value={field.value} onChange={e => field.setter(parseFloat(e.target.value) || 0)} />
               </div>
             ))}
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <div>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Entrada (%)</label>
-                <input className="input" type="number" min={10} max={80} value={downPct}
-                  onChange={e => setDownPct(parseFloat(e.target.value) || 20)} />
+                <input className="input" type="number" min={10} max={80} value={downPct} onChange={e => setDownPct(parseFloat(e.target.value) || 20)} />
               </div>
               <div>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Prazo (meses)</label>
@@ -146,7 +196,6 @@ export default function Planning() {
               </div>
             </div>
           </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {[
               { label: 'Entrada', value: fmtBRL(downPayment), color: 'var(--amber)' },
@@ -160,7 +209,6 @@ export default function Planning() {
               </div>
             ))}
           </div>
-
           {incomeCommitPct > 30 && (
             <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(239,68,68,0.1)', borderRadius: 8, fontSize: 12, color: 'var(--red)' }}>
               ⚠️ Parcela acima de 30% da renda — acima do recomendado
@@ -174,27 +222,29 @@ export default function Planning() {
         </div>
       </div>
 
-      {/* Can I buy */}
+      {/* Can I buy — with AI */}
       <div className="card">
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>🛒 Posso Comprar?</div>
-
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          {(['avista', 'parcelado'] as const).map(m => (
-            <button key={m} onClick={() => setBuyMode(m)} className="btn btn-sm"
-              style={{
-                background: buyMode === m ? 'var(--bg-card2)' : 'transparent',
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>🛒 Posso Comprar?</div>
+          <div style={{ display: 'flex', gap: 6, padding: 3, background: 'var(--bg-card2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+            {(['avista', 'parcelado'] as const).map(m => (
+              <button key={m} onClick={() => { setBuyMode(m); setAiAnalysis('') }} className="btn btn-sm" style={{
+                background: buyMode === m ? 'var(--bg-card)' : 'transparent',
                 border: buyMode === m ? '1px solid var(--border)' : '1px solid transparent',
                 color: buyMode === m ? 'var(--text)' : 'var(--text-muted)',
-              }}>
-              {m === 'avista' ? 'À Vista' : 'Parcelado'}
-            </button>
-          ))}
+              }}>{m === 'avista' ? 'À Vista' : 'Parcelado'}</button>
+            ))}
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: buyMode === 'parcelado' ? '1fr 1fr 1fr' : '1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: buyMode === 'parcelado' ? '2fr 1fr 1fr 1fr' : '2fr 1fr', gap: 10, marginBottom: 16 }}>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>O que você quer comprar?</label>
+            <input className="input" value={buyDescription} onChange={e => setBuyDescription(e.target.value)} placeholder="Ex: iPhone, sofá, viagem..." />
+          </div>
           <div>
             <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Valor (R$)</label>
-            <input className="input" type="number" value={buyValue || ''} onChange={e => setBuyValue(parseFloat(e.target.value) || 0)} placeholder="0,00" />
+            <input className="input" type="number" value={buyValue || ''} onChange={e => { setBuyValue(parseFloat(e.target.value) || 0); setAiAnalysis('') }} placeholder="0,00" />
           </div>
           {buyMode === 'parcelado' && (
             <>
@@ -203,7 +253,7 @@ export default function Planning() {
                 <input className="input" type="number" min={1} max={60} value={buyInstallments} onChange={e => setBuyInstallments(parseInt(e.target.value) || 1)} />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Taxa Mensal (%)</label>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Taxa/mês (%)</label>
                 <input className="input" type="number" step={0.01} value={buyRate} onChange={e => setBuyRate(parseFloat(e.target.value) || 0)} />
               </div>
             </>
@@ -211,65 +261,97 @@ export default function Planning() {
         </div>
 
         {buyValue > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center' }}>
-            <div style={{
-              width: 80, height: 80, borderRadius: '50%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: (buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-              border: `2px solid ${(buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? 'var(--green)' : 'var(--red)'}`,
-              fontSize: 28,
-              flexShrink: 0,
-            }}>
-              {(buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? '✓' : '✗'}
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+              <div style={{
+                width: 72, height: 72, borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
+                background: (buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                border: `2px solid ${(buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? 'var(--green)' : 'var(--red)'}`,
+              }}>
+                {(buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? '✓' : '✗'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {buyMode === 'avista' ? (
+                  <>
+                    {[
+                      { label: 'Veredicto', value: canBuyAvista ? 'Pode comprar!' : 'Não recomendado', color: canBuyAvista ? 'var(--green)' : 'var(--red)' },
+                      { label: '% do Saldo', value: buyPctBalance.toFixed(1) + '%', color: buyPctBalance > 80 ? 'var(--red)' : 'var(--amber)' },
+                      { label: 'Saldo Restante', value: fmtBRL(balAfterBuy), color: balAfterBuy >= 0 ? 'var(--green)' : 'var(--red)' },
+                    ].map(item => (
+                      <div key={item.label} style={{ background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{item.label}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: item.color }}>{item.value}</div>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {[
+                      { label: 'Parcela', value: fmtBRL(installmentValue), color: 'var(--cadu)' },
+                      { label: '% da Renda', value: installmentPctIncome.toFixed(1) + '%', color: installmentPctIncome > 30 ? 'var(--red)' : 'var(--green)' },
+                      { label: 'Total c/ Juros', value: fmtBRL(totalPaid), color: 'var(--amber)' },
+                    ].map(item => (
+                      <div key={item.label} style={{ background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{item.label}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: item.color }}>{item.value}</div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {buyMode === 'avista' ? (
-                <>
-                  {[
-                    { label: 'Veredicto', value: canBuyAvista ? 'Pode comprar!' : 'Não pode', color: canBuyAvista ? 'var(--green)' : 'var(--red)' },
-                    { label: '% do Saldo', value: buyPctBalance.toFixed(1) + '%', color: buyPctBalance > 80 ? 'var(--red)' : 'var(--amber)' },
-                    { label: 'Saldo Restante', value: fmtBRL(balAfterBuy), color: balAfterBuy >= 0 ? 'var(--green)' : 'var(--red)' },
-                  ].map(item => (
-                    <div key={item.label} style={{ background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 12px' }}>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{item.label}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: item.color }}>{item.value}</div>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <>
-                  {[
-                    { label: 'Parcela', value: fmtBRL(installmentValue), color: 'var(--cadu)' },
-                    { label: '% da Renda', value: installmentPctIncome.toFixed(1) + '%', color: installmentPctIncome > 30 ? 'var(--red)' : 'var(--green)' },
-                    { label: 'Total c/ Juros', value: fmtBRL(totalPaid), color: 'var(--amber)' },
-                  ].map(item => (
-                    <div key={item.label} style={{ background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 12px' }}>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{item.label}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: item.color }}>{item.value}</div>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          </div>
+            {/* AI Button */}
+            <button
+              onClick={askAI}
+              disabled={aiLoading}
+              style={{
+                width: '100%', padding: '11px', borderRadius: 12, border: 'none', cursor: aiLoading ? 'wait' : 'pointer',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                color: '#fff', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: aiLoading ? 0.7 : 1, transition: 'all 0.15s',
+                marginBottom: aiAnalysis ? 12 : 0,
+              }}
+            >
+              {aiLoading ? <Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={15} />}
+              {aiLoading ? 'Analisando...' : 'Analisar com IA'}
+            </button>
+
+            {/* AI Result */}
+            {aiAnalysis && (
+              <div style={{
+                padding: '14px 16px', borderRadius: 12,
+                background: 'rgba(99,102,241,0.08)',
+                border: '1px solid rgba(99,102,241,0.2)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <Sparkles size={13} color="var(--cadu)" />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--cadu)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Análise IA
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text)' }}>
+                  {aiAnalysis}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Budget limits */}
       <div className="card">
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>📊 Limites de Orçamento</div>
-
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <select className="input" value={budgetCategory} onChange={e => setBudgetCategory(e.target.value)}>
             <option value="">Selecionar categoria...</option>
             {CATEGORIES_EXPENSE.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <input className="input" style={{ maxWidth: 140 }} type="number" placeholder="Limite R$"
-            value={budgetValue} onChange={e => setBudgetValue(e.target.value)} />
+          <input className="input" style={{ maxWidth: 140 }} type="number" placeholder="Limite R$" value={budgetValue} onChange={e => setBudgetValue(e.target.value)} />
           <button className="btn btn-primary" onClick={saveBudget}><Check size={14} /> Salvar</button>
         </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
           {state.budgetLimits.map(bl => {
             const spent = monthTxs.filter(t => t.type === 'expense' && t.category === bl.category).reduce((s, t) => s + t.amount, 0)

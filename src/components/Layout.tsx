@@ -3,10 +3,7 @@ import { useApp } from '../hooks/useApp'
 import { USERS } from '../types'
 import { fmtMonth } from '../lib/store'
 import { format, addMonths, subMonths, parseISO } from 'date-fns'
-import {
-  LayoutDashboard, TrendingUp, ArrowLeftRight, Target,
-  Receipt, ChevronLeft, ChevronRight, Settings
-} from 'lucide-react'
+import { LayoutDashboard, TrendingUp, ArrowLeftRight, Target, Receipt, ChevronLeft, ChevronRight, Settings, LogOut } from 'lucide-react'
 
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -17,10 +14,9 @@ const NAV = [
   { to: '/settings', icon: Settings, label: 'Config.' },
 ]
 
-export default function Layout() {
+export default function Layout({ onLogout }: { onLogout: () => void }) {
   const { state, setActiveUser, setSelectedMonth } = useApp()
   const { activeUser, selectedMonth } = state
-  const location = useLocation()
 
   const prevMonth = () => {
     const d = parseISO(selectedMonth + '-01')
@@ -33,15 +29,11 @@ export default function Layout() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      {/* Sidebar */}
       <aside style={{
-        width: 200,
-        flexShrink: 0,
+        width: 200, flexShrink: 0,
         background: 'var(--bg-card)',
         borderRight: '1px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '20px 0',
+        display: 'flex', flexDirection: 'column', padding: '20px 0',
       }}>
         {/* Logo */}
         <div style={{ padding: '0 20px 24px' }}>
@@ -58,20 +50,13 @@ export default function Layout() {
             const u = USERS[uid]
             const active = activeUser === uid
             return (
-              <button
-                key={uid}
-                onClick={() => setActiveUser(uid)}
-                style={{
-                  flex: 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  padding: '7px 8px',
-                  borderRadius: 10,
-                  border: active ? `1px solid ${u.color}40` : '1px solid var(--border)',
-                  background: active ? `${u.color}18` : 'transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
+              <button key={uid} onClick={() => setActiveUser(uid)} style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '7px 8px', borderRadius: 10,
+                border: active ? `1px solid ${u.color}40` : '1px solid var(--border)',
+                background: active ? `${u.color}18` : 'transparent',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}>
                 <div className="avatar" style={{ width: 22, height: 22, fontSize: 10, background: `${u.color}30`, color: u.color }}>
                   {u.avatar}
                 </div>
@@ -86,23 +71,16 @@ export default function Layout() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {NAV.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              style={({ isActive }) => ({
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 12px',
-                borderRadius: 10,
-                color: isActive ? 'var(--text)' : 'var(--text-muted)',
-                background: isActive ? 'var(--bg-card2)' : 'transparent',
-                textDecoration: 'none',
-                fontSize: 13,
-                fontWeight: isActive ? 500 : 400,
-                transition: 'all 0.15s',
-                border: isActive ? '1px solid var(--border)' : '1px solid transparent',
-              })}
-            >
+            <NavLink key={to} to={to} end={to === '/'} style={({ isActive }) => ({
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 12px', borderRadius: 10,
+              color: isActive ? 'var(--text)' : 'var(--text-muted)',
+              background: isActive ? 'var(--bg-card2)' : 'transparent',
+              textDecoration: 'none', fontSize: 13,
+              fontWeight: isActive ? 500 : 400,
+              transition: 'all 0.15s',
+              border: isActive ? '1px solid var(--border)' : '1px solid transparent',
+            })}>
               <Icon size={15} />
               {label}
             </NavLink>
@@ -110,11 +88,11 @@ export default function Layout() {
         </nav>
 
         {/* Month selector */}
-        <div style={{ padding: '16px 12px 0', borderTop: '1px solid var(--border)' }}>
+        <div style={{ padding: '12px 12px 0', borderTop: '1px solid var(--border)' }}>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, paddingLeft: 4 }}>
             Período
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 12 }}>
             <button onClick={prevMonth} className="btn btn-ghost btn-sm" style={{ padding: '6px 8px' }}>
               <ChevronLeft size={13} />
             </button>
@@ -125,10 +103,15 @@ export default function Layout() {
               <ChevronRight size={13} />
             </button>
           </div>
+
+          {/* Logout */}
+          <button onClick={onLogout} className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', gap: 8, fontSize: 12 }}>
+            <LogOut size={13} />
+            Sair
+          </button>
         </div>
       </aside>
 
-      {/* Main */}
       <main style={{ flex: 1, overflow: 'auto', padding: '28px 28px' }}>
         <Outlet />
       </main>

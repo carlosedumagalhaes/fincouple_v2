@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useApp } from '../hooks/useApp'
 import { Transaction, USERS, CATEGORIES_INCOME, PAYMENT_METHODS } from '../types'
-import { fmtBRL, getMonthTransactions, generateId } from '../lib/store'
+import { fmtBRL, getMonthTransactions, calcTotals, generateId } from '../lib/store'
 import { Trash2, RotateCcw, Plus, Pencil, X, Check } from 'lucide-react'
+import { format } from 'date-fns'
 
 function IncomeModal({
   onClose,
@@ -76,7 +77,7 @@ function IncomeModal({
               className="input"
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Ex: Salário TRB Pharma, Freelance..."
+              placeholder="Ex: Salário, Freelance..."
             />
           </div>
 
@@ -115,7 +116,7 @@ function IncomeModal({
             <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
             <button
               className="btn"
-              style={{ flex: 1, background: u.color, color: '#fff' }}
+              style={{ flex: 1, background: `${u.color}`, color: '#fff' }}
               onClick={submit}
             >
               <Check size={14} /> {isEdit ? 'Salvar' : 'Adicionar'}
@@ -138,6 +139,7 @@ export default function Settings() {
     monthTxs.filter(t => t.userId === uid && t.type === 'income')
 
   const hardReset = () => {
+    // Clear all possible keys — v1, v2, and everything else
     Object.keys(localStorage).forEach(k => localStorage.removeItem(k))
     window.location.reload()
   }
@@ -151,10 +153,12 @@ export default function Settings() {
         <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>Receitas e perfis do casal</div>
       </div>
 
+      {/* Income per user */}
       {(['cadu', 'stephanie'] as const).map(uid => {
         const u = USERS[uid]
         const incomes = incomeByUser(uid)
         const total = incomes.reduce((s, t) => s + t.amount, 0)
+
         return (
           <div key={uid} className="card" style={{ borderColor: `${u.color}25` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -185,13 +189,20 @@ export default function Settings() {
             </div>
 
             {incomes.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: 13, border: '1px dashed var(--border)', borderRadius: 10 }}>
-                Nenhuma receita para {u.name} neste mês
+              <div style={{
+                textAlign: 'center', padding: '20px 0',
+                color: 'var(--text-muted)', fontSize: 13,
+                border: '1px dashed var(--border)', borderRadius: 10
+              }}>
+                Nenhuma receita registrada para {u.name} neste mês
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {incomes.map(t => (
-                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 14px' }}>
+                  <div key={t.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 14px'
+                  }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{t.description || t.category}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
@@ -200,9 +211,15 @@ export default function Settings() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--green)' }}>{fmtBRL(t.amount)}</span>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setEditingTx(t)}><Pencil size={12} /></button>
-                      <button className="btn btn-danger btn-sm" onClick={() => deleteTransaction(t.id)}><Trash2 size={12} /></button>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--green)' }}>
+                        {fmtBRL(t.amount)}
+                      </span>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setEditingTx(t)} title="Editar">
+                        <Pencil size={12} />
+                      </button>
+                      <button className="btn btn-danger btn-sm" onClick={() => deleteTransaction(t.id)} title="Remover">
+                        <Trash2 size={12} />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -212,39 +229,65 @@ export default function Settings() {
         )
       })}
 
+      {/* About */}
       <div className="card">
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>ℹ️ Sobre o FinCouple</div>
-        {[
-          { label: 'Versão', value: '2.0.0' },
-          { label: 'Stack', value: 'React + TypeScript + Vite' },
-          { label: 'Banco', value: 'localStorage (offline-first)' },
-          { label: 'Dados', value: `${state.transactions.length} transações · ${state.goals.length} metas` },
-        ].map(item => (
-          <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{item.label}</span>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>{item.value}</span>
-          </div>
-        ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {[
+            { label: 'Versão', value: '2.0.0' },
+            { label: 'Stack', value: 'React + TypeScript + Vite' },
+            { label: 'Banco', value: 'localStorage (offline-first)' },
+            { label: 'Hospedagem', value: 'Vercel / Netlify (gratuito)' },
+            { label: 'Dados', value: `${state.transactions.length} transações · ${state.goals.length} metas` },
+          ].map(item => (
+            <div key={item.label} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '10px 0', borderBottom: '1px solid var(--border)'
+            }}>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{item.label}</span>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{item.value}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
+      {/* Danger zone */}
       <div className="card" style={{ borderColor: 'rgba(239,68,68,0.2)' }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 4, color: 'var(--red)' }}>⚠️ Zona de Perigo</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Apaga TODOS os dados. Irreversível.</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 4, color: 'var(--red)' }}>
+          ⚠️ Zona de Perigo
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+          Apaga TODOS os dados (transações, metas, divisões). Irreversível.
+        </div>
         {!confirmReset ? (
           <button className="btn btn-danger" onClick={() => setConfirmReset(true)}>
             <RotateCcw size={14} /> Limpar todos os dados
           </button>
         ) : (
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, color: 'var(--red)', fontWeight: 500 }}>Tem certeza? Não tem volta.</span>
-            <button className="btn btn-danger" onClick={hardReset}><Trash2 size={14} /> Sim, apagar tudo</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmReset(false)}>Cancelar</button>
+            <span style={{ fontSize: 13, color: 'var(--red)', fontWeight: 500 }}>
+              Tem certeza absoluta? Não tem volta.
+            </span>
+            <button className="btn btn-danger" onClick={hardReset}>
+              <Trash2 size={14} /> Sim, apagar tudo
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmReset(false)}>
+              Cancelar
+            </button>
           </div>
         )}
       </div>
 
-      {addingFor && <IncomeModal userId={addingFor} onClose={() => setAddingFor(null)} />}
-      {editingTx && <IncomeModal userId={editingTx.userId} initial={editingTx} onClose={() => setEditingTx(null)} />}
+      {addingFor && (
+        <IncomeModal userId={addingFor} onClose={() => setAddingFor(null)} />
+      )}
+      {editingTx && (
+        <IncomeModal
+          userId={editingTx.userId}
+          initial={editingTx}
+          onClose={() => setEditingTx(null)}
+        />
+      )}
     </div>
   )
 }

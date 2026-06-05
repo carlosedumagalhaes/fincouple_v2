@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { AppState, Transaction, Goal, SplitExpense, BudgetLimit, UserId } from '../types'
 import { loadState, saveState, generateId } from '../lib/store'
-import { format } from 'date-fns'
 
 interface AppContextType {
   state: AppState
@@ -22,12 +21,14 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null)
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AppState>(() => loadState())
+export function AppProvider({ children, initialUser }: { children: React.ReactNode, initialUser: UserId }) {
+  const [state, setState] = useState<AppState>(() => {
+    const s = loadState()
+    s.activeUser = initialUser
+    return s
+  })
 
-  useEffect(() => {
-    saveState(state)
-  }, [state])
+  useEffect(() => { saveState(state) }, [state])
 
   const update = useCallback((fn: (s: AppState) => AppState) => {
     setState(prev => fn(prev))
