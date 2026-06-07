@@ -4,7 +4,7 @@ import { fmtBRL, getMonthTransactions, calcTotals } from '../lib/store'
 import { CATEGORIES_EXPENSE } from '../types'
 import { Check, Sparkles, Loader } from 'lucide-react'
 
-const GEMINI_API_KEY = 'CAQ.Ab8RN6IxKZex1GAgOpJHWB1MNG_H8iaOweA7oKB_7m46g3RSQA'
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY ?? ''
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`
 
 function priceInstallment(principal: number, annualRate: number, months: number): number {
