@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useApp } from '../hooks/useApp'
 import { fmtBRL, getMonthTransactions, calcTotals } from '../lib/store'
 import { CATEGORIES_EXPENSE } from '../types'
-import { Check, Sparkles, Loader, Key, X } from 'lucide-react'
+import { Check, Sparkles, Loader } from 'lucide-react'
 
-const GEMINI_KEY_STORAGE = 'fincouple_gemini_key'
+const GEMINI_API_KEY = 'CAQ.Ab8RN6IxKZex1GAgOpJHWB1MNG_H8iaOweA7oKB_7m46g3RSQA'
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`
 
 function priceInstallment(principal: number, annualRate: number, months: number): number {
   if (annualRate === 0) return principal / months
@@ -12,65 +13,11 @@ function priceInstallment(principal: number, annualRate: number, months: number)
   return principal * (r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1)
 }
 
-function ApiKeyModal({ onSave, onClose }: { onSave: (key: string) => void, onClose: () => void }) {
-  const [key, setKey] = useState('')
-  return (
-    <div className="modal-bg" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 420 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Key size={16} color="var(--cadu)" />
-            <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>
-              Configurar Gemini API
-            </h2>
-          </div>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}><X size={14} /></button>
-        </div>
-
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
-          A key fica salva só no seu navegador e é usada para a IA analisar suas finanças.
-          <br /><br />
-          Para pegar a key gratuita:
-          <ol style={{ paddingLeft: 20, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <li>Acesse <strong style={{ color: 'var(--text)' }}>aistudio.google.com</strong></li>
-            <li>Clique em <strong style={{ color: 'var(--text)' }}>Get API Key</strong></li>
-            <li>Crie ou selecione um projeto</li>
-            <li>Copie a key e cole abaixo</li>
-          </ol>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <input
-            className="input"
-            autoFocus
-            type="password"
-            placeholder="AIza..."
-            value={key}
-            onChange={e => setKey(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && key && onSave(key)}
-          />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
-            <button
-              className="btn"
-              style={{ flex: 1, background: 'var(--cadu)', color: '#fff' }}
-              onClick={() => key && onSave(key)}
-            >
-              <Check size={14} /> Salvar e usar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function Planning() {
   const { state, setBudgetLimit } = useApp()
   const monthTxs = getMonthTransactions(state.transactions, state.selectedMonth)
   const { income } = calcTotals(monthTxs)
 
-  // Emergency fund
   const [emergMonths, setEmergMonths] = useState(6)
   const fixedTotal = monthTxs.filter(t => t.type === 'expense' && t.isFixed).reduce((s, t) => s + t.amount, 0)
   const emergTarget = fixedTotal * emergMonths
@@ -78,30 +25,24 @@ export default function Planning() {
   const emergLeft = Math.max(emergTarget - emergSaved, 0)
   const emergMonthly = income > 0 ? Math.min(income * 0.2, emergLeft) : 0
 
-  // Property simulator
   const [propValue, setPropValue] = useState(700000)
   const [downPct, setDownPct] = useState(20)
   const [propRate, setPropRate] = useState(10.5)
   const [propMonths, setPropMonths] = useState(360)
-
   const downPayment = propValue * (downPct / 100)
   const financed = propValue - downPayment
   const installment = priceInstallment(financed, propRate, propMonths)
   const incomeCommitPct = income > 0 ? (installment / income) * 100 : 0
   const monthsToDown = downPayment > 0 && income > 0 ? Math.ceil((downPayment - emergSaved) / (income * 0.3)) : 0
 
-  // "Can I buy" simulator
   const [buyValue, setBuyValue] = useState(0)
   const [buyInstallments, setBuyInstallments] = useState(12)
   const [buyRate, setBuyRate] = useState(2.99)
   const [buyMode, setBuyMode] = useState<'avista' | 'parcelado'>('avista')
   const [buyDescription, setBuyDescription] = useState('')
-
-  // AI
   const [aiAnalysis, setAiAnalysis] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
-  const [showKeyModal, setShowKeyModal] = useState(false)
-  const [hasKey, setHasKey] = useState(() => !!localStorage.getItem(GEMINI_KEY_STORAGE))
+  const [aiError, setAiError] = useState('')
 
   const balance = income - monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const canBuyAvista = buyValue <= balance
@@ -111,7 +52,6 @@ export default function Planning() {
   const totalPaid = installmentValue * buyInstallments
   const installmentPctIncome = income > 0 ? (installmentValue / income) * 100 : 0
 
-  // Budget limits
   const [budgetCategory, setBudgetCategory] = useState('')
   const [budgetValue, setBudgetValue] = useState('')
   const saveBudget = () => {
@@ -121,80 +61,51 @@ export default function Planning() {
     setBudgetValue('')
   }
 
-  const saveKey = (key: string) => {
-    localStorage.setItem(GEMINI_KEY_STORAGE, key)
-    setHasKey(true)
-    setShowKeyModal(false)
-    askAI(key)
-  }
-
-  const askAI = async (keyOverride?: string) => {
-    const apiKey = keyOverride ?? localStorage.getItem(GEMINI_KEY_STORAGE)
-    if (!apiKey) { setShowKeyModal(true); return }
+  const askAI = async () => {
     if (!buyValue) return
-
     setAiLoading(true)
     setAiAnalysis('')
+    setAiError('')
 
     const totalExpense = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    const topCategories = CATEGORIES_EXPENSE
+    const topCats = CATEGORIES_EXPENSE
       .map(cat => ({ cat, val: monthTxs.filter(t => t.type === 'expense' && t.category === cat).reduce((s, t) => s + t.amount, 0) }))
       .filter(c => c.val > 0).sort((a, b) => b.val - a.val).slice(0, 4)
       .map(c => `${c.cat}: ${fmtBRL(c.val)}`).join(', ')
-
     const goalsInfo = state.goals.filter(g => g.scope === 'shared').slice(0, 2)
-      .map(g => `${g.name} (${((g.currentAmount / g.targetAmount) * 100).toFixed(0)}% da meta)`).join(', ')
+      .map(g => `${g.name} (${((g.currentAmount / g.targetAmount) * 100).toFixed(0)}%)`).join(', ')
 
     const prompt = buyMode === 'avista'
       ? `Você é um consultor financeiro brasileiro direto e simpático. Analise se o casal deve fazer esta compra:
-
 COMPRA: ${buyDescription || 'Item'} — ${fmtBRL(buyValue)} à vista
-RENDA DO CASAL: ${fmtBRL(income)}/mês
-GASTOS TOTAIS: ${fmtBRL(totalExpense)}/mês
-SALDO ATUAL: ${fmtBRL(balance)}
-SALDO APÓS COMPRA: ${fmtBRL(balAfterBuy)} (${buyPctBalance.toFixed(1)}% do saldo usado)
-MAIORES GASTOS: ${topCategories || 'sem dados ainda'}
-METAS EM ANDAMENTO: ${goalsInfo || 'nenhuma'}
-
-Dê um parecer em 3-4 linhas: pode ou não pode, por que, e uma dica prática. Use números reais. Sem markdown.`
+RENDA DO CASAL: ${fmtBRL(income)}/mês | GASTOS: ${fmtBRL(totalExpense)}/mês | SALDO: ${fmtBRL(balance)}
+APÓS COMPRA: ${fmtBRL(balAfterBuy)} restante (${buyPctBalance.toFixed(1)}% do saldo usado)
+MAIORES GASTOS: ${topCats || 'sem dados'} | METAS: ${goalsInfo || 'nenhuma'}
+Dê um parecer em 3-4 linhas: pode ou não, por que, e uma dica. Use números reais. Sem markdown.`
       : `Você é um consultor financeiro brasileiro direto e simpático. Analise se o casal deve parcelar:
-
 COMPRA: ${buyDescription || 'Item'} — ${fmtBRL(buyValue)} em ${buyInstallments}x de ${fmtBRL(installmentValue)} (${buyRate}% a.m.)
 TOTAL COM JUROS: ${fmtBRL(totalPaid)} (juros: ${fmtBRL(totalPaid - buyValue)})
-RENDA DO CASAL: ${fmtBRL(income)}/mês
-GASTOS TOTAIS: ${fmtBRL(totalExpense)}/mês
-SALDO ATUAL: ${fmtBRL(balance)}
-PARCELA = ${installmentPctIncome.toFixed(1)}% da renda mensal
-MAIORES GASTOS: ${topCategories || 'sem dados ainda'}
-METAS EM ANDAMENTO: ${goalsInfo || 'nenhuma'}
-
-Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo real dos juros, uma dica. Sem markdown.`
+RENDA: ${fmtBRL(income)}/mês | GASTOS: ${fmtBRL(totalExpense)}/mês | SALDO: ${fmtBRL(balance)}
+PARCELA = ${installmentPctIncome.toFixed(1)}% da renda | METAS: ${goalsInfo || 'nenhuma'}
+Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, uma dica. Sem markdown.`
 
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
-          }),
-        }
-      )
+      const res = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
+        }),
+      })
       const data = await res.json()
       if (data.error) {
-        if (data.error.code === 400 || data.error.code === 403) {
-          setAiAnalysis('API key inválida. Clique no ícone de chave para atualizar.')
-        } else {
-          setAiAnalysis(`Erro: ${data.error.message}`)
-        }
+        setAiError(`Erro da API: ${data.error.message}`)
       } else {
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Sem resposta.'
-        setAiAnalysis(text)
+        setAiAnalysis(data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Sem resposta.')
       }
     } catch {
-      setAiAnalysis('Erro de conexão. Verifique sua internet e tente novamente.')
+      setAiError('Erro de conexão. Verifique sua internet.')
     } finally {
       setAiLoading(false)
     }
@@ -208,7 +119,6 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo real dos ju
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Emergency */}
         <div className="card">
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>🛡️ Reserva de Emergência</div>
           <div style={{ marginBottom: 14 }}>
@@ -245,7 +155,6 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo real dos ju
           </div>
         </div>
 
-        {/* Property */}
         <div className="card">
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>🏡 Simulador de Imóvel</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
@@ -266,7 +175,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo real dos ju
               <div>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Prazo (meses)</label>
                 <select className="input" value={propMonths} onChange={e => setPropMonths(parseInt(e.target.value))}>
-                  {[120, 180, 240, 300, 360, 420].map(m => <option key={m} value={m}>{m}m ({m/12}a)</option>)}
+                  {[120,180,240,300,360,420].map(m => <option key={m} value={m}>{m}m ({m/12}a)</option>)}
                 </select>
               </div>
             </div>
@@ -297,31 +206,17 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo real dos ju
         </div>
       </div>
 
-      {/* Can I buy + AI */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>🛒 Posso Comprar?</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Key config button */}
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => setShowKeyModal(true)}
-              title={hasKey ? 'Trocar API key do Gemini' : 'Configurar API key do Gemini'}
-              style={{ color: hasKey ? 'var(--green)' : 'var(--text-muted)' }}
-            >
-              <Key size={13} />
-              {hasKey ? 'Gemini ✓' : 'Configurar IA'}
-            </button>
-            {/* Mode toggle */}
-            <div style={{ display: 'flex', gap: 4, padding: 3, background: 'var(--bg-card2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-              {(['avista', 'parcelado'] as const).map(m => (
-                <button key={m} onClick={() => { setBuyMode(m); setAiAnalysis('') }} className="btn btn-sm" style={{
-                  background: buyMode === m ? 'var(--bg-card)' : 'transparent',
-                  border: buyMode === m ? '1px solid var(--border)' : '1px solid transparent',
-                  color: buyMode === m ? 'var(--text)' : 'var(--text-muted)',
-                }}>{m === 'avista' ? 'À Vista' : 'Parcelado'}</button>
-              ))}
-            </div>
+          <div style={{ display: 'flex', gap: 4, padding: 3, background: 'var(--bg-card2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+            {(['avista', 'parcelado'] as const).map(m => (
+              <button key={m} onClick={() => { setBuyMode(m); setAiAnalysis(''); setAiError('') }} className="btn btn-sm" style={{
+                background: buyMode === m ? 'var(--bg-card)' : 'transparent',
+                border: buyMode === m ? '1px solid var(--border)' : '1px solid transparent',
+                color: buyMode === m ? 'var(--text)' : 'var(--text-muted)',
+              }}>{m === 'avista' ? 'À Vista' : 'Parcelado'}</button>
+            ))}
           </div>
         </div>
 
@@ -332,108 +227,89 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo real dos ju
           </div>
           <div>
             <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Valor (R$)</label>
-            <input className="input" type="number" value={buyValue || ''} onChange={e => { setBuyValue(parseFloat(e.target.value) || 0); setAiAnalysis('') }} placeholder="0,00" />
+            <input className="input" type="number" value={buyValue || ''} onChange={e => { setBuyValue(parseFloat(e.target.value) || 0); setAiAnalysis(''); setAiError('') }} placeholder="0,00" />
           </div>
-          {buyMode === 'parcelado' && (
-            <>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Parcelas</label>
-                <input className="input" type="number" min={1} max={60} value={buyInstallments} onChange={e => setBuyInstallments(parseInt(e.target.value) || 1)} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Taxa/mês (%)</label>
-                <input className="input" type="number" step={0.01} value={buyRate} onChange={e => setBuyRate(parseFloat(e.target.value) || 0)} />
-              </div>
-            </>
-          )}
+          {buyMode === 'parcelado' && (<>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Parcelas</label>
+              <input className="input" type="number" min={1} max={60} value={buyInstallments} onChange={e => setBuyInstallments(parseInt(e.target.value) || 1)} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Taxa/mês (%)</label>
+              <input className="input" type="number" step={0.01} value={buyRate} onChange={e => setBuyRate(parseFloat(e.target.value) || 0)} />
+            </div>
+          </>)}
         </div>
 
-        {buyValue > 0 && (
-          <>
-            {/* Result cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center', marginBottom: 16 }}>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%', flexShrink: 0, fontSize: 26,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: (buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-                border: `2px solid ${(buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? 'var(--green)' : 'var(--red)'}`,
-              }}>
-                {(buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? '✓' : '✗'}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                {buyMode === 'avista' ? (
-                  <>
-                    {[
-                      { label: 'Veredicto', value: canBuyAvista ? 'Pode comprar!' : 'Não recomendado', color: canBuyAvista ? 'var(--green)' : 'var(--red)' },
-                      { label: '% do Saldo', value: buyPctBalance.toFixed(1) + '%', color: buyPctBalance > 80 ? 'var(--red)' : 'var(--amber)' },
-                      { label: 'Saldo Restante', value: fmtBRL(balAfterBuy), color: balAfterBuy >= 0 ? 'var(--green)' : 'var(--red)' },
-                    ].map(item => (
-                      <div key={item.label} style={{ background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{item.label}</div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: item.color }}>{item.value}</div>
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  <>
-                    {[
-                      { label: 'Parcela', value: fmtBRL(installmentValue), color: 'var(--cadu)' },
-                      { label: '% da Renda', value: installmentPctIncome.toFixed(1) + '%', color: installmentPctIncome > 30 ? 'var(--red)' : 'var(--green)' },
-                      { label: 'Total c/ Juros', value: fmtBRL(totalPaid), color: 'var(--amber)' },
-                    ].map(item => (
-                      <div key={item.label} style={{ background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{item.label}</div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: item.color }}>{item.value}</div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
+        {buyValue > 0 && (<>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%', flexShrink: 0, fontSize: 26,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: (buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+              border: `2px solid ${(buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? 'var(--green)' : 'var(--red)'}`,
+            }}>
+              {(buyMode === 'avista' ? canBuyAvista : installmentPctIncome <= 30) ? '✓' : '✗'}
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {buyMode === 'avista' ? (<>
+                {[
+                  { label: 'Veredicto', value: canBuyAvista ? 'Pode comprar!' : 'Não recomendado', color: canBuyAvista ? 'var(--green)' : 'var(--red)' },
+                  { label: '% do Saldo', value: buyPctBalance.toFixed(1) + '%', color: buyPctBalance > 80 ? 'var(--red)' : 'var(--amber)' },
+                  { label: 'Saldo Restante', value: fmtBRL(balAfterBuy), color: balAfterBuy >= 0 ? 'var(--green)' : 'var(--red)' },
+                ].map(item => (
+                  <div key={item.label} style={{ background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{item.label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: item.color }}>{item.value}</div>
+                  </div>
+                ))}
+              </>) : (<>
+                {[
+                  { label: 'Parcela', value: fmtBRL(installmentValue), color: 'var(--cadu)' },
+                  { label: '% da Renda', value: installmentPctIncome.toFixed(1) + '%', color: installmentPctIncome > 30 ? 'var(--red)' : 'var(--green)' },
+                  { label: 'Total c/ Juros', value: fmtBRL(totalPaid), color: 'var(--amber)' },
+                ].map(item => (
+                  <div key={item.label} style={{ background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{item.label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: item.color }}>{item.value}</div>
+                  </div>
+                ))}
+              </>)}
+            </div>
+          </div>
 
-            {/* AI Button */}
-            <button
-              onClick={() => askAI()}
-              disabled={aiLoading}
-              style={{
-                width: '100%', padding: '11px', borderRadius: 12, border: 'none',
-                cursor: aiLoading ? 'wait' : 'pointer',
-                background: 'linear-gradient(135deg, #4f52e8, #7c3aed)',
-                color: '#fff', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: aiLoading ? 0.7 : 1, transition: 'all 0.15s',
-                marginBottom: aiAnalysis ? 12 : 0,
-              }}
-            >
-              {aiLoading
-                ? <><Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Analisando com Gemini...</>
-                : <><Sparkles size={15} /> {hasKey ? 'Analisar com IA' : 'Analisar com IA (configurar key)'}</>
-              }
-            </button>
+          <button onClick={askAI} disabled={aiLoading} style={{
+            width: '100%', padding: '12px', borderRadius: 12, border: 'none',
+            cursor: aiLoading ? 'wait' : 'pointer',
+            background: 'linear-gradient(135deg, #4f52e8, #7c3aed)',
+            color: '#fff', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            opacity: aiLoading ? 0.7 : 1, transition: 'all 0.15s',
+            marginBottom: (aiAnalysis || aiError) ? 12 : 0,
+          }}>
+            {aiLoading
+              ? <><Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Analisando com Gemini...</>
+              : <><Sparkles size={15} /> Analisar com IA Gemini</>}
+          </button>
 
-            {/* AI Result */}
-            {aiAnalysis && (
-              <div style={{
-                padding: '14px 16px', borderRadius: 12,
-                background: 'rgba(99,102,241,0.08)',
-                border: '1px solid rgba(99,102,241,0.25)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  <Sparkles size={13} color="var(--cadu)" />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--cadu)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Análise Gemini
-                  </span>
-                </div>
-                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text)' }}>
-                  {aiAnalysis}
-                </div>
+          {aiAnalysis && (
+            <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Sparkles size={13} color="var(--cadu)" />
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--cadu)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Análise Gemini</span>
               </div>
-            )}
-          </>
-        )}
+              <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text)' }}>{aiAnalysis}</div>
+            </div>
+          )}
+
+          {aiError && (
+            <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 12, color: 'var(--red)' }}>
+              ⚠️ {aiError}
+            </div>
+          )}
+        </>)}
       </div>
 
-      {/* Budget limits */}
       <div className="card">
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>📊 Limites de Orçamento</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -467,8 +343,6 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo real dos ju
           })}
         </div>
       </div>
-
-      {showKeyModal && <ApiKeyModal onSave={saveKey} onClose={() => setShowKeyModal(false)} />}
     </div>
   )
 }
