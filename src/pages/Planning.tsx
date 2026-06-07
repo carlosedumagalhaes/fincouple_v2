@@ -4,7 +4,8 @@ import { fmtBRL, getMonthTransactions, calcTotals } from '../lib/store'
 import { CATEGORIES_EXPENSE } from '../types'
 import { Check, Sparkles, Loader } from 'lucide-react'
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY ?? ''
+// ⚠️ Troque pela sua key do Google AI Studio (aistudio.google.com)
+const GEMINI_API_KEY = 'COLOQUE_SUA_KEY_AQUI'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`
 
 function priceInstallment(principal: number, annualRate: number, months: number): number {
@@ -18,6 +19,7 @@ export default function Planning() {
   const monthTxs = getMonthTransactions(state.transactions, state.selectedMonth)
   const { income } = calcTotals(monthTxs)
 
+  // Reserva de emergência
   const [emergMonths, setEmergMonths] = useState(6)
   const fixedTotal = monthTxs.filter(t => t.type === 'expense' && t.isFixed).reduce((s, t) => s + t.amount, 0)
   const emergTarget = fixedTotal * emergMonths
@@ -25,6 +27,7 @@ export default function Planning() {
   const emergLeft = Math.max(emergTarget - emergSaved, 0)
   const emergMonthly = income > 0 ? Math.min(income * 0.2, emergLeft) : 0
 
+  // Simulador de imóvel
   const [propValue, setPropValue] = useState(700000)
   const [downPct, setDownPct] = useState(20)
   const [propRate, setPropRate] = useState(10.5)
@@ -35,6 +38,7 @@ export default function Planning() {
   const incomeCommitPct = income > 0 ? (installment / income) * 100 : 0
   const monthsToDown = downPayment > 0 && income > 0 ? Math.ceil((downPayment - emergSaved) / (income * 0.3)) : 0
 
+  // Posso comprar
   const [buyValue, setBuyValue] = useState(0)
   const [buyInstallments, setBuyInstallments] = useState(12)
   const [buyRate, setBuyRate] = useState(2.99)
@@ -52,6 +56,7 @@ export default function Planning() {
   const totalPaid = installmentValue * buyInstallments
   const installmentPctIncome = income > 0 ? (installmentValue / income) * 100 : 0
 
+  // Orçamento
   const [budgetCategory, setBudgetCategory] = useState('')
   const [budgetValue, setBudgetValue] = useState('')
   const saveBudget = () => {
@@ -118,6 +123,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
         <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>Metas, simulações e orçamento</div>
       </div>
 
+      {/* Reserva + Imóvel */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div className="card">
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>🛡️ Reserva de Emergência</div>
@@ -206,6 +212,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
         </div>
       </div>
 
+      {/* Posso Comprar */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>🛒 Posso Comprar?</div>
@@ -278,6 +285,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
             </div>
           </div>
 
+          {/* Botão IA */}
           <button onClick={askAI} disabled={aiLoading} style={{
             width: '100%', padding: '12px', borderRadius: 12, border: 'none',
             cursor: aiLoading ? 'wait' : 'pointer',
@@ -289,9 +297,11 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
           }}>
             {aiLoading
               ? <><Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Analisando com Gemini...</>
-              : <><Sparkles size={15} /> Analisar com IA Gemini</>}
+              : <><Sparkles size={15} /> Analisar com IA Gemini</>
+            }
           </button>
 
+          {/* Resultado IA */}
           {aiAnalysis && (
             <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -302,6 +312,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
             </div>
           )}
 
+          {/* Erro */}
           {aiError && (
             <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 12, color: 'var(--red)' }}>
               ⚠️ {aiError}
@@ -310,6 +321,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
         </>)}
       </div>
 
+      {/* Limites de orçamento */}
       <div className="card">
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>📊 Limites de Orçamento</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
