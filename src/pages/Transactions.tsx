@@ -57,75 +57,99 @@ function TransactionModal({
   }
 
   return (
-    <div className="modal-bg" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17 }}>
+    <div className="sheet-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="sheet fade-up">
+        {/* Header do Modal */}
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="t-headline">
             {isEdit ? 'Editar Transação' : 'Nova Transação'}
           </h2>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}><X size={14} /></button>
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={onClose}>
+            <X size={16} />
+          </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Type */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            {(['expense', 'income'] as const).map(t => (
+        {/* Formulário */}
+        <div className="flex flex-col gap-4">
+          
+          {/* Tipo de Transação (O Quadrado Protetor com Efeito Apple) */}
+          <div className="flex flex-col gap-1.5">
+            <span className="field-label">Tipo</span>
+            <div className="segmented-container">
               <button
-                key={t}
-                onClick={() => setForm(f => ({ ...f, type: t, category: '' }))}
-                className="btn"
-                style={{
-                  flex: 1,
-                  background: form.type === t ? (t === 'income' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)') : 'var(--bg-card2)',
-                  color: form.type === t ? (t === 'income' ? 'var(--green)' : 'var(--red)') : 'var(--text-muted)',
-                  border: `1px solid ${form.type === t ? (t === 'income' ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)') : 'var(--border)'}`,
-                }}
+                type="button"
+                onClick={() => setForm(f => ({ ...f, type: 'expense', category: '' }))}
+                className={`seg-button ${form.type === 'expense' ? 'active-despesa' : ''}`}
               >
-                {t === 'income' ? '↑ Receita' : '↓ Despesa'}
+                ↓ Despesa
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, type: 'income', category: '' }))}
+                className={`seg-button ${form.type === 'income' ? 'active-receita' : ''}`}
+              >
+                ↑ Receita
+              </button>
+            </div>
           </div>
 
-          {/* User + Scope */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {/* Quem + Escopo */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Quem</label>
-              <select className="input" value={form.userId} onChange={e => setForm(f => ({ ...f, userId: e.target.value as any }))}>
-                {Object.values(USERS).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              <label className="field-label">Quem</label>
+              <select 
+                className="field" 
+                value={form.userId} 
+                onChange={e => setForm(f => ({ ...f, userId: e.target.value as any }))}
+              >
+                {Object.values(USERS).map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Escopo</label>
-              <select className="input" value={form.scope} onChange={e => setForm(f => ({ ...f, scope: e.target.value as any }))}>
+              <label className="field-label">Escopo</label>
+              <select 
+                className="field" 
+                value={form.scope} 
+                onChange={e => setForm(f => ({ ...f, scope: e.target.value as any }))}
+              >
                 <option value="personal">Pessoal</option>
                 <option value="shared">Compartilhado</option>
               </select>
             </div>
           </div>
 
+          {/* Categoria */}
           <div>
-            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Categoria</label>
-            <select className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+            <label className="field-label">Categoria</label>
+            <select 
+              className="field" 
+              value={form.category} 
+              onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+            >
               <option value="">Selecionar...</option>
               {cats.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
 
+          {/* Descrição */}
           <div>
-            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Descrição</label>
+            <label className="field-label">Descrição</label>
             <input
-              className="input"
+              className="field"
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               placeholder="Ex: Mercado, Aluguel..."
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {/* Valor + Data */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Valor (R$)</label>
+              <label className="field-label">Valor (R$)</label>
               <input
-                className="input"
+                className="field t-mono"
                 type="number"
                 step="0.01"
                 value={form.amount}
@@ -134,9 +158,9 @@ function TransactionModal({
               />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Data</label>
+              <label className="field-label">Data</label>
               <input
-                className="input"
+                className="field"
                 type="date"
                 value={form.date}
                 onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
@@ -144,31 +168,41 @@ function TransactionModal({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {/* Forma de Pagamento + Gasto Fixo */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Pagamento</label>
-              <select className="input" value={form.paymentMethod} onChange={e => setForm(f => ({ ...f, paymentMethod: e.target.value }))}>
+              <label className="field-label">Pagamento</label>
+              <select 
+                className="field" 
+                value={form.paymentMethod} 
+                onChange={e => setForm(f => ({ ...f, paymentMethod: e.target.value }))}
+              >
                 {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+            <div className="flex items-center pt-5 pl-1">
+              <label className="flex items-center gap-2.5 cursor-pointer text-sm select-none">
                 <input
                   type="checkbox"
+                  style={{ width: 'auto', backgroundColor: 'transparent' }}
                   checked={form.isFixed}
                   onChange={e => setForm(f => ({ ...f, isFixed: e.target.checked }))}
                 />
-                Gasto fixo
+                <span style={{ color: 'var(--label-secondary)' }}>Gasto fixo</span>
               </label>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={submit}>
-              <Check size={14} /> {isEdit ? 'Salvar' : 'Adicionar'}
+          {/* Ações Inferiores */}
+          <div className="flex gap-3 mt-3">
+            <button type="button" className="btn btn-ghost flex-1" onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="button" className="btn btn-primary flex-1" onClick={submit}>
+              <Check size={16} /> {isEdit ? 'Salvar' : 'Adicionar'}
             </button>
           </div>
+
         </div>
       </div>
     </div>
@@ -204,74 +238,66 @@ export default function Transactions() {
   const totalExpense = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
 
   return (
-    <div className="animate-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div className="stagger flex flex-col gap-5">
+      {/* Header da Tela Principal */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em' }}>
-            Lançamentos
-          </h1>
-          <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>
+          <h1 className="t-largetitle">Lançamentos</h1>
+          <div style={{ color: 'var(--label-secondary)', fontSize: 13, marginTop: 2 }}>
             {filtered.length} transações
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={14} /> Nova
+          <Plus size={16} /> Nova
         </button>
       </div>
 
-      {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+      {/* Cards de Resumo */}
+      <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Receitas', value: totalIncome, color: 'var(--green)' },
           { label: 'Despesas', value: totalExpense, color: 'var(--red)' },
           { label: 'Saldo', value: totalIncome - totalExpense, color: totalIncome - totalExpense >= 0 ? 'var(--green)' : 'var(--red)' },
         ].map(item => (
-          <div key={item.label} className="card card-sm" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+          <div key={item.label} className="card flex flex-col items-center justify-center p-4">
+            <div style={{ fontSize: 11, color: 'var(--label-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
               {item.label}
             </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: item.color }}>{fmtBRL(item.value)}</div>
+            <div className="t-title2" style={{ color: item.color }}>{fmtBRL(item.value)}</div>
           </div>
         ))}
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Barra de Filtros */}
+      <div className="flex gap-2 flex-wrap items-center">
         <input
-          className="input"
+          className="field"
           style={{ maxWidth: 200 }}
           placeholder="Buscar..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div style={{ display: 'flex', gap: 4 }}>
+        
+        {/* Filtro por Usuário */}
+        <div className="segmented">
           {(['all', 'cadu', 'stephanie', 'shared'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className="btn btn-sm"
-              style={{
-                background: filter === f ? 'var(--bg-card2)' : 'transparent',
-                border: filter === f ? '1px solid var(--border)' : '1px solid transparent',
-                color: filter === f ? 'var(--text)' : 'var(--text-muted)',
-              }}
+              className={`seg-item ${filter === f ? 'active' : ''}`}
             >
               {f === 'all' ? 'Todos' : f === 'cadu' ? 'Cadu' : f === 'stephanie' ? 'Stephanie' : 'Compartilhados'}
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+
+        {/* Filtro por Tipo */}
+        <div className="segmented">
           {(['all', 'income', 'expense'] as const).map(f => (
             <button
               key={f}
               onClick={() => setTypeFilter(f)}
-              className="btn btn-sm"
-              style={{
-                background: typeFilter === f ? 'var(--bg-card2)' : 'transparent',
-                border: typeFilter === f ? '1px solid var(--border)' : '1px solid transparent',
-                color: typeFilter === f ? 'var(--text)' : 'var(--text-muted)',
-              }}
+              className={`seg-item ${typeFilter === f ? 'active' : ''}`}
             >
               {f === 'all' ? 'Tipo' : f === 'income' ? '↑ Receita' : '↓ Despesa'}
             </button>
@@ -279,9 +305,9 @@ export default function Transactions() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Tabela de Lançamentos */}
       <div className="card" style={{ padding: 0 }}>
-        <div className="table-wrap">
+        <div className="table-scroll">
           <table>
             <thead>
               <tr>
@@ -298,7 +324,7 @@ export default function Transactions() {
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--label-tertiary)', padding: '40px 0' }}>
                     {state.transactions.length === 0
                       ? 'Nenhuma transação ainda — clique em "Nova" para começar!'
                       : 'Nenhuma transação encontrada com esses filtros'}
@@ -309,17 +335,17 @@ export default function Transactions() {
                 const u = USERS[t.userId]
                 return (
                   <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => setEditing(t)}>
-                    <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{t.date.slice(5)}</td>
+                    <td className="t-mono" style={{ color: 'var(--label-secondary)', fontSize: 13 }}>{t.date.slice(5)}</td>
                     <td style={{ fontWeight: 500 }}>{t.description || '—'}</td>
                     <td>
-                      <span className="pill" style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)' }}>
+                      <span className="pill" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--label-secondary)' }}>
                         {t.category}
                       </span>
                     </td>
                     <td>
                       <div
                         className="avatar"
-                        style={{ background: `${u.color}25`, color: u.color }}
+                        style={{ background: `${u.color}25`, color: u.color, width: 26, height: 26, fontSize: 12 }}
                         title={u.name}
                       >
                         {u.avatar}
@@ -329,32 +355,32 @@ export default function Transactions() {
                       <span
                         className="pill"
                         style={{
-                          background: t.scope === 'shared' ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.05)',
-                          color: t.scope === 'shared' ? 'var(--cadu)' : 'var(--text-muted)',
+                          background: t.scope === 'shared' ? 'rgba(110,107,245,0.12)' : 'rgba(255,255,255,0.04)',
+                          color: t.scope === 'shared' ? 'var(--cadu)' : 'var(--label-secondary)',
                         }}
                       >
                         {t.scope === 'shared' ? 'Compartilhado' : 'Pessoal'}
                       </span>
                     </td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{t.paymentMethod}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, color: t.type === 'income' ? 'var(--green)' : 'var(--red)' }}>
+                    <td style={{ color: 'var(--label-secondary)' }}>{t.paymentMethod}</td>
+                    <td className="t-mono" style={{ textAlign: 'right', fontWeight: 600, color: t.type === 'income' ? 'var(--green)' : 'var(--red)' }}>
                       {t.type === 'income' ? '+' : '-'}{fmtBRL(t.amount)}
                     </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                    <td>
+                      <div className="flex gap-1 justify-center" onClick={e => e.stopPropagation()}>
                         <button
-                          className="btn btn-ghost btn-sm"
+                          className="btn btn-ghost btn-icon-sm"
                           onClick={() => setEditing(t)}
                           title="Editar"
                         >
-                          <Pencil size={12} />
+                          <Pencil size={13} />
                         </button>
                         <button
-                          className="btn btn-danger btn-sm"
+                          className="btn btn-danger btn-icon-sm"
                           onClick={() => deleteTransaction(t.id)}
                           title="Deletar"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </td>
@@ -366,9 +392,9 @@ export default function Transactions() {
         </div>
       </div>
 
-      {/* Hint */}
+      {/* Dica Inferior */}
       {filtered.length > 0 && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+        <div style={{ fontSize: 12, color: 'var(--label-tertiary)', textAlign: 'center' }}>
           Clique em qualquer linha para editar
         </div>
       )}
