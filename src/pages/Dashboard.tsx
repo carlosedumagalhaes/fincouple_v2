@@ -41,16 +41,23 @@ export default function Dashboard() {
 
   const monthTxs = getMonthTransactions(transactions, selectedMonth)
 
+  // Couple totals
   const coupleIncome = monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const coupleExpense = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const coupleBalance = coupleIncome - coupleExpense
+
   const sharedExpense = monthTxs.filter(t => t.type === 'expense' && t.scope === 'shared').reduce((s, t) => s + t.amount, 0)
 
+  // Per user
   const caduIncome = monthTxs.filter(t => t.userId === 'cadu' && t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const stephanieIncome = monthTxs.filter(t => t.userId === 'stephanie' && t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  const caduExpense = monthTxs.filter(t => t.userId === 'cadu' && t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  const stephanieExpense = monthTxs.filter(t => t.userId === 'stephanie' && t.type === 'expense').reduce((s, t) => s + t.amount, 0)
 
+  // Split balance
   const splitBal = calcSplitBalance(splitExpenses.filter(s => s.date.startsWith(selectedMonth)))
 
+  // History 6 months
   const historyData = Array.from({ length: 6 }, (_, i) => {
     const d = subMonths(parseISO(selectedMonth + '-01'), 5 - i)
     const m = format(d, 'yyyy-MM')
@@ -60,6 +67,7 @@ export default function Dashboard() {
     return { month: months[d.getMonth()], income: totals.income, expense: totals.expense }
   })
 
+  // Category breakdown
   const catData = CATEGORIES_EXPENSE
     .map(cat => ({
       name: cat,
@@ -69,8 +77,9 @@ export default function Dashboard() {
     .sort((a, b) => b.value - a.value)
     .slice(0, 6)
 
-  const COLORS = ['#818cf8', '#fb7185', '#34d399', '#fbbf24', '#60a5fa', '#a78bfa']
+  const COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6']
 
+  // Budget alerts
   const alerts = budgetLimits.map(bl => {
     const spent = monthTxs.filter(t => t.type === 'expense' && t.category === bl.category).reduce((s, t) => s + t.amount, 0)
     const pct = (spent / bl.limit) * 100
@@ -78,9 +87,9 @@ export default function Dashboard() {
   }).filter(a => a.pct >= 70)
 
   return (
-    <div className="animate-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="animate-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em' }}>
             Dashboard
@@ -89,15 +98,21 @@ export default function Dashboard() {
             Visão financeira do casal
           </div>
         </div>
-        <div style={{ display: 'flex', background: 'var(--glass)', border: '1px solid var(--glass-border)', borderRadius: 12, padding: 3, gap: 2, backdropFilter: 'blur(10px)' }}>
+
+        {/* View toggle */}
+        <div style={{ display: 'flex', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 3, gap: 2 }}>
           {(['couple', 'personal'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)} style={{
-              padding: '6px 14px', borderRadius: 9, border: 'none', cursor: 'pointer',
-              fontSize: 12, fontWeight: 500,
-              background: view === v ? 'rgba(129,140,248,0.2)' : 'transparent',
-              color: view === v ? 'var(--text)' : 'var(--text-muted)',
-              transition: 'all 0.15s',
-            }}>
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                padding: '6px 14px', borderRadius: 9, border: 'none', cursor: 'pointer',
+                fontSize: 12, fontWeight: 500,
+                background: view === v ? 'var(--bg-card2)' : 'transparent',
+                color: view === v ? 'var(--text)' : 'var(--text-muted)',
+                transition: 'all 0.15s',
+              }}
+            >
               {v === 'couple' ? '👫 Casal' : '👤 Pessoal'}
             </button>
           ))}
@@ -111,9 +126,9 @@ export default function Dashboard() {
             <div key={a.category} style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '8px 14px', borderRadius: 10,
-              background: a.pct >= 100 ? 'rgba(248,113,113,0.12)' : 'rgba(251,191,36,0.12)',
-              border: `1px solid ${a.pct >= 100 ? 'rgba(248,113,113,0.25)' : 'rgba(251,191,36,0.25)'}`,
-              fontSize: 12, backdropFilter: 'blur(10px)',
+              background: a.pct >= 100 ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+              border: `1px solid ${a.pct >= 100 ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)'}`,
+              fontSize: 12,
             }}>
               <AlertTriangle size={13} color={a.pct >= 100 ? 'var(--red)' : 'var(--amber)'} />
               <span style={{ color: 'var(--text-muted)' }}>{a.category}:</span>
@@ -127,49 +142,51 @@ export default function Dashboard() {
 
       {view === 'couple' ? (
         <>
-          {/* Summary cards — auto-fit para mobile */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          {/* Couple summary cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
             <StatCard label="Renda Total" value={fmtBRL(coupleIncome)} icon={TrendingUp} color="var(--green)"
               sub={`Cadu ${fmtBRL(caduIncome)} · Steph ${fmtBRL(stephanieIncome)}`} />
             <StatCard label="Gastos Totais" value={fmtBRL(coupleExpense)} icon={TrendingDown} color="var(--red)"
-              sub="Fixos · Variáveis" />
-            <StatCard label="Compartilhados" value={fmtBRL(sharedExpense)} icon={Users} color="var(--cadu)"
+              sub={`Fixos · Variáveis`} />
+            <StatCard label="Gastos Compartilhados" value={fmtBRL(sharedExpense)} icon={Users} color="var(--cadu)"
               sub="Despesas do casal" />
             <StatCard label="Saldo do Mês" value={fmtBRL(coupleBalance)} icon={Wallet}
               color={coupleBalance >= 0 ? 'var(--green)' : 'var(--red)'}
-              sub={coupleBalance >= 0 ? 'Dentro do orçamento' : 'Atenção!'} />
+              sub={coupleBalance >= 0 ? 'Dentro do orçamento' : 'Atenção ao orçamento'} />
           </div>
 
-          {/* Charts — empilha no mobile */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+          {/* Charts row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {/* Area chart */}
             <div className="card">
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Últimos 6 Meses</div>
               <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={historyData}>
                   <defs>
                     <linearGradient id="gIncome" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="gExpense" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f87171" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#f87171" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false}
                     tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
                   <Tooltip
-                    contentStyle={{ background: 'rgba(15,12,40,0.9)', border: '1px solid var(--glass-border)', borderRadius: 12, fontSize: 12, backdropFilter: 'blur(20px)' }}
+                    contentStyle={{ background: 'var(--bg-card2)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }}
                     formatter={(v) => fmtBRL(Number(v))}
                   />
-                  <Area type="monotone" dataKey="income" stroke="#34d399" fill="url(#gIncome)" strokeWidth={2} name="Receita" />
-                  <Area type="monotone" dataKey="expense" stroke="#f87171" fill="url(#gExpense)" strokeWidth={2} name="Gasto" />
+                  <Area type="monotone" dataKey="income" stroke="#10b981" fill="url(#gIncome)" strokeWidth={2} name="Receita" />
+                  <Area type="monotone" dataKey="expense" stroke="#ef4444" fill="url(#gExpense)" strokeWidth={2} name="Gasto" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
 
+            {/* Pie chart */}
             <div className="card">
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Gastos por Categoria</div>
               {catData.length === 0 ? (
@@ -178,9 +195,9 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-                  <ResponsiveContainer width={130} height={130}>
+                  <ResponsiveContainer width={140} height={140}>
                     <PieChart>
-                      <Pie data={catData} dataKey="value" cx="50%" cy="50%" innerRadius={32} outerRadius={58} paddingAngle={3}>
+                      <Pie data={catData} dataKey="value" cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={3}>
                         {catData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                       </Pie>
                     </PieChart>
@@ -203,7 +220,7 @@ export default function Dashboard() {
 
           {/* Split balance */}
           {Math.abs(splitBal) > 0.01 && (
-            <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                   Saldo de Divisão
@@ -218,44 +235,44 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-              <div className="pill" style={{ background: 'rgba(129,140,248,0.15)', color: 'var(--cadu)' }}>
+              <div className="pill" style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--cadu)' }}>
                 Ver em Divisão →
               </div>
             </div>
           )}
 
           {/* Goals preview */}
-          {goals.filter(g => g.scope === 'shared').length > 0 && (
-            <div className="card">
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Metas do Casal</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {goals.filter(g => g.scope === 'shared').slice(0, 3).map(g => {
-                  const pct = Math.min((g.currentAmount / g.targetAmount) * 100, 100)
-                  return (
-                    <div key={g.id}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span>{g.emoji}</span>
-                          <span style={{ fontSize: 13, fontWeight: 500 }}>{g.name}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fmtBRL(g.currentAmount)} / {fmtBRL(g.targetAmount)}</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: g.color }}>{pct.toFixed(0)}%</span>
-                        </div>
+          <div className="card">
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Metas do Casal</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {goals.filter(g => g.scope === 'shared').slice(0, 3).map(g => {
+                const pct = Math.min((g.currentAmount / g.targetAmount) * 100, 100)
+                return (
+                  <div key={g.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>{g.emoji}</span>
+                        <span style={{ fontSize: 13, fontWeight: 500 }}>{g.name}</span>
                       </div>
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${pct}%`, background: g.color }} />
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fmtBRL(g.currentAmount)}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>/ {fmtBRL(g.targetAmount)}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: g.color }}>{pct.toFixed(0)}%</span>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
+                    <div className="progress-bar">
+                      <div className="progress-fill" style={{ width: `${pct}%`, background: g.color }} />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          )}
+          </div>
         </>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+          {/* Personal view */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
             {(['cadu', 'stephanie'] as const).map(uid => {
               const u = USERS[uid]
               const inc = monthTxs.filter(t => t.userId === uid && t.type === 'income').reduce((s, t) => s + t.amount, 0)
@@ -278,7 +295,7 @@ export default function Dashboard() {
                       { label: 'Gastos', value: exp, color: 'var(--red)' },
                       { label: 'Saldo', value: bal, color: bal >= 0 ? 'var(--green)' : 'var(--red)' },
                     ].map(item => (
-                      <div key={item.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '10px 12px' }}>
+                      <div key={item.label} style={{ background: 'var(--bg-card2)', borderRadius: 10, padding: '10px 12px' }}>
                         <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                           {item.label}
                         </div>
