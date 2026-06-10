@@ -1,11 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ============================================================
-   FINCOUPLE — APPLE DESIGN SYSTEM
+   FINCOUPLE — APPLE DESIGN SYSTEM (RESOLVIDO)
    SF Pro → Inter (closest web substitute)
    Liquid Glass · visionOS palette · iOS motion
    ============================================================ */
@@ -158,7 +158,6 @@ body {
   transition: border-color 0.2s var(--ease), transform 0.2s var(--ease);
 }
 
-/* Top shine — Apple glass highlight */
 .card::after {
   content: '';
   position: absolute;
@@ -263,38 +262,48 @@ svg.sf-icon {
   overflow: hidden;
 }
 
-/* ============= INPUT / FIELD ============= */
-.field {
+/* ============= INPUT / FIELD (CORREÇÃO DE CONTRASTE) ============= */
+/* Bloqueia fundos brancos injetados por navegadores ou resets agressivos */
+.field, input, select, textarea {
   background: rgba(255, 255, 255, 0.05) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border: 1px solid var(--glass-border) !important;
   border-radius: var(--radius-sm);
   padding: 11px 14px;
   color: var(--label) !important;
   font-family: var(--font);
   font-size: 15px;
-  outline: none; 
+  outline: none;
   width: 100%;
   transition: border-color 0.15s, background 0.15s;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
 }
-.field:focus {
-  border-color: var(--cadu);
+
+.field:focus, input:focus, select:focus, textarea:focus {
+  border-color: var(--cadu) !important;
   background: rgba(110, 107, 245, 0.08) !important;
   box-shadow: 0 0 0 3px rgba(110, 107, 245, 0.15);
 }
-.field::placeholder { color: var(--label-tertiary); }
-select.field option { background: #1c1c28; color: var(--label); }
+
+input::placeholder, textarea::placeholder { 
+  color: var(--label-tertiary) !important; 
+}
+
+select option { 
+  background: #0a0a0f !important; 
+  color: var(--label) !important; 
+}
+
 .field-label {
   font-size: 13px; font-weight: 500;
   color: var(--label-secondary);
   display: block; margin-bottom: 6px;
 }
 
-/* ============= BUTTON ============= */
+/* ============= BUTTONS ============= */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   padding: 10px 18px;
@@ -346,19 +355,19 @@ select.field option { background: #1c1c28; color: var(--label); }
 .btn-icon { padding: 8px; border-radius: var(--radius-sm); }
 .btn-icon-sm { padding: 6px; border-radius: var(--radius-xs); }
 
-/* ============= TYPE SELECTORS (DESPESA / RECEITA) ============= */
+/* ============= ESTADOS REPOSITÓRIO DESPESA / RECEITA ============= */
 .btn-despesa-active {
   background: rgba(255, 69, 58, 0.2) !important;
   color: var(--red) !important;
-  border: 1px solid rgba(255, 69, 58, 0.35) !important;
-  box-shadow: 0 0 12px rgba(255, 69, 58, 0.15);
+  border: 1px solid rgba(255, 69, 58, 0.4) !important;
+  box-shadow: 0 0 14px rgba(255, 69, 58, 0.15);
 }
 
 .btn-receita-active {
-  background: rgba(48, 209, 88, 0.2) !important;
+  background: rgba(48, 209, 88, 0.18) !important;
   color: var(--green) !important;
-  border: 1px solid rgba(48, 209, 88, 0.35) !important;
-  box-shadow: 0 0 12px rgba(48, 209, 88, 0.15);
+  border: 1px solid rgba(48, 209, 88, 0.4) !important;
+  box-shadow: 0 0 14px rgba(48, 209, 88, 0.15);
 }
 
 .btn-type-inactive {
@@ -532,26 +541,12 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 /* Safe area for notched phones */
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
-/* ============= AJUSTES DE COMPATIBILIDADE NATIVA ============= */
-input, select, textarea {
-  color-scheme: dark;
-}
-
-input, select, textarea, button {
-  background: transparent;
-  font-family: inherit;
-}
-
-/* Fallback seguro caso os inputs percam a classe .field por algum motivo */
-input[type="text"]:not(.field), 
-input[type="number"]:not(.field), 
-input[type="date"]:not(.field), 
-select:not(.field) {
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  color: var(--label);
-  padding: 11px 14px;
+/* ============= ANTIAUTOFILL NATIVO DO NAVEGADOR ============= */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--label) !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 input[type="number"]::-webkit-inner-spin-button,
