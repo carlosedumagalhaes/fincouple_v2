@@ -221,7 +221,7 @@ export default function Transactions() {
       </div>
 
       {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
         {[
           { label: 'Receitas', value: totalIncome, color: 'var(--green)' },
           { label: 'Despesas', value: totalExpense, color: 'var(--red)' },

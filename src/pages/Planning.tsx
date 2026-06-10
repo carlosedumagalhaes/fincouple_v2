@@ -4,9 +4,8 @@ import { fmtBRL, getMonthTransactions, calcTotals } from '../lib/store'
 import { CATEGORIES_EXPENSE } from '../types'
 import { Check, Sparkles, Loader } from 'lucide-react'
 
-// ⚠️ Troque pela sua key do Google AI Studio (aistudio.google.com)
-const GEMINI_API_KEY = 'COLOQUE_SUA_KEY_AQUI'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`
+const GROQ_API_KEY = import.meta.env.VITE_GEMINI_KEY ?? ''
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 function priceInstallment(principal: number, annualRate: number, months: number): number {
   if (annualRate === 0) return principal / months
@@ -19,7 +18,6 @@ export default function Planning() {
   const monthTxs = getMonthTransactions(state.transactions, state.selectedMonth)
   const { income } = calcTotals(monthTxs)
 
-  // Reserva de emergência
   const [emergMonths, setEmergMonths] = useState(6)
   const fixedTotal = monthTxs.filter(t => t.type === 'expense' && t.isFixed).reduce((s, t) => s + t.amount, 0)
   const emergTarget = fixedTotal * emergMonths
@@ -27,7 +25,6 @@ export default function Planning() {
   const emergLeft = Math.max(emergTarget - emergSaved, 0)
   const emergMonthly = income > 0 ? Math.min(income * 0.2, emergLeft) : 0
 
-  // Simulador de imóvel
   const [propValue, setPropValue] = useState(700000)
   const [downPct, setDownPct] = useState(20)
   const [propRate, setPropRate] = useState(10.5)
@@ -38,7 +35,6 @@ export default function Planning() {
   const incomeCommitPct = income > 0 ? (installment / income) * 100 : 0
   const monthsToDown = downPayment > 0 && income > 0 ? Math.ceil((downPayment - emergSaved) / (income * 0.3)) : 0
 
-  // Posso comprar
   const [buyValue, setBuyValue] = useState(0)
   const [buyInstallments, setBuyInstallments] = useState(12)
   const [buyRate, setBuyRate] = useState(2.99)
@@ -56,7 +52,6 @@ export default function Planning() {
   const totalPaid = installmentValue * buyInstallments
   const installmentPctIncome = income > 0 ? (installmentValue / income) * 100 : 0
 
-  // Orçamento
   const [budgetCategory, setBudgetCategory] = useState('')
   const [budgetValue, setBudgetValue] = useState('')
   const saveBudget = () => {
@@ -95,19 +90,24 @@ PARCELA = ${installmentPctIncome.toFixed(1)}% da renda | METAS: ${goalsInfo || '
 Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, uma dica. Sem markdown.`
 
     try {
-      const res = await fetch(GEMINI_URL, {
+      const res = await fetch(GROQ_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 300,
+          temperature: 0.7,
         }),
       })
       const data = await res.json()
       if (data.error) {
-        setAiError(`Erro da API: ${data.error.message}`)
+        setAiError(`Erro: ${data.error.message}`)
       } else {
-        setAiAnalysis(data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Sem resposta.')
+        setAiAnalysis(data.choices?.[0]?.message?.content ?? 'Sem resposta.')
       }
     } catch {
       setAiError('Erro de conexão. Verifique sua internet.')
@@ -123,8 +123,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
         <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>Metas, simulações e orçamento</div>
       </div>
 
-      {/* Reserva + Imóvel */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
         <div className="card">
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>🛡️ Reserva de Emergência</div>
           <div style={{ marginBottom: 14 }}>
@@ -140,7 +139,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
               ))}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10, marginBottom: 14 }}>
             {[
               { label: 'Meta Total', value: fmtBRL(emergTarget), color: 'var(--text)' },
               { label: 'Já Guardado', value: fmtBRL(emergSaved), color: 'var(--green)' },
@@ -173,7 +172,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
                 <input className="input" type="number" step={field.step} value={field.value} onChange={e => field.setter(parseFloat(e.target.value) || 0)} />
               </div>
             ))}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 8 }}>
               <div>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Entrada (%)</label>
                 <input className="input" type="number" min={10} max={80} value={downPct} onChange={e => setDownPct(parseFloat(e.target.value) || 20)} />
@@ -186,7 +185,7 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
               </div>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 8 }}>
             {[
               { label: 'Entrada', value: fmtBRL(downPayment), color: 'var(--amber)' },
               { label: 'Financiado', value: fmtBRL(financed), color: 'var(--text-muted)' },
@@ -212,7 +211,6 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
         </div>
       </div>
 
-      {/* Posso Comprar */}
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>🛒 Posso Comprar?</div>
@@ -285,7 +283,6 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
             </div>
           </div>
 
-          {/* Botão IA */}
           <button onClick={askAI} disabled={aiLoading} style={{
             width: '100%', padding: '12px', borderRadius: 12, border: 'none',
             cursor: aiLoading ? 'wait' : 'pointer',
@@ -296,23 +293,20 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
             marginBottom: (aiAnalysis || aiError) ? 12 : 0,
           }}>
             {aiLoading
-              ? <><Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Analisando com Gemini...</>
-              : <><Sparkles size={15} /> Analisar com IA Gemini</>
-            }
+              ? <><Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Analisando com IA...</>
+              : <><Sparkles size={15} /> Analisar com IA</>}
           </button>
 
-          {/* Resultado IA */}
           {aiAnalysis && (
             <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <Sparkles size={13} color="var(--cadu)" />
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--cadu)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Análise Gemini</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--cadu)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Análise IA</span>
               </div>
               <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text)' }}>{aiAnalysis}</div>
             </div>
           )}
 
-          {/* Erro */}
           {aiError && (
             <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 12, color: 'var(--red)' }}>
               ⚠️ {aiError}
@@ -321,7 +315,6 @@ Dê um parecer em 3-4 linhas: vale parcelar ou pagar à vista, custo dos juros, 
         </>)}
       </div>
 
-      {/* Limites de orçamento */}
       <div className="card">
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>📊 Limites de Orçamento</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
