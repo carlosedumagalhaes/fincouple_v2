@@ -131,19 +131,23 @@ export default function Planning() {
               ))}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <Mini label="Meta Total"      value={fmtBRL(emergTarget)} />
-            <Mini label="Já Guardado"     value={fmtBRL(emergSaved)}              color="var(--green)" />
-            <Mini label="Ainda Falta"     value={fmtBRL(emergLeft)}               color={emergLeft > 0 ? 'var(--red)' : 'var(--green)'} />
-            <Mini label="Aporte Sugerido" value={fmtBRL(emergMonthly) + '/mês'}   color="var(--cadu)" />
+         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+            {[
+              { label: 'Meta Total',      value: fmtBRL(emergTarget),                color: undefined },
+              { label: 'Já Guardado',     value: fmtBRL(emergSaved),                 color: 'var(--green)' },
+              { label: 'Ainda Falta',     value: fmtBRL(emergLeft),                  color: emergLeft > 0 ? 'var(--red)' : 'var(--green)' },
+              { label: 'Aporte Sugerido', value: fmtBRL(emergMonthly) + '/mês',      color: 'var(--cadu)' },
+            ].map(item => (
+              <div key={item.label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--label-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>
+                  {item.label}
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: item.color ?? 'var(--label)', fontVariantNumeric: 'tabular-nums' }}>
+                  {item.value}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="progress-track-lg">
-            <div className="progress-fill" style={{ width: `${emergPct}%`, background: 'var(--green)' }} />
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--label-tertiary)', marginTop: 6, textAlign: 'right' }}>
-            {emergPct.toFixed(1)}% da meta
-          </div>
-        </div>
 
         {/* Imóvel */}
         <div className="card">
